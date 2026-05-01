@@ -906,6 +906,44 @@
   }
   .review-advice-card .ad-icon { font-size: 28px; flex-shrink: 0; }
 
+
+  /* 未受取おこづかいカード */
+  .unclaimed-card {
+    background: linear-gradient(135deg, #d4eccc, #b8d8a8);
+    border-radius: 18px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(143,168,126,0.25);
+  }
+  .uc-icon { font-size: 32px; flex-shrink: 0; }
+  .uc-info { flex: 1; }
+  .uc-label { font-size: 12px; color: #4a6a3a; font-weight: 700; margin-bottom: 2px; }
+  .uc-amount {
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px;
+    color: #4a6a3a;
+    line-height: 1;
+  }
+  .uc-amount span { font-size: 14px; opacity: 0.8; }
+  .uc-detail { font-size: 11px; color: #4a6a3a; opacity: 0.8; margin-top: 3px; }
+  .uc-claim-btn {
+    background: white;
+    color: #4a6a3a;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    flex-shrink: 0;
+  }
+  .uc-claim-btn:active { background: #f0f0f0; }
+
   /* バックアップリマインダー */
   .backup-reminder {
     background: linear-gradient(135deg, #fef3d0, #fde5a0);
@@ -1408,9 +1446,6 @@
   <!-- HOME -->
   <div class="page active" id="page-home">
 
-    <!-- バックアップリマインダー -->
-    <div class="backup-reminder" id="backup-reminder" style="display:none"></div>
-
     <!-- 目標ゲージ（目標あるときだけ表示） -->
     <div class="home-goal-area" id="home-goal-area" style="display:none"></div>
 
@@ -1427,6 +1462,9 @@
         <span style="font-size:8px;opacity:0.7;display:block;margin-top:2px;">→目標へ</span>
       </div>
     </div>
+
+    <!-- 未受取おこづかい（使えるお金の下） -->
+    <div class="unclaimed-card" id="unclaimed-card" style="display:none"></div>
 
     <!-- アクションボタン（5つ） -->
     <div class="action-btns" style="grid-template-columns: repeat(5,1fr);">
@@ -1550,16 +1588,36 @@
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">周期</label>
-        <select class="form-select" id="set-cycle">
+        <label class="form-label">どれくらいでもらう？</label>
+        <select class="form-select" id="set-cycle" onchange="onCycleChange()">
           <option value="weekly">毎週</option>
           <option value="biweekly">2週ごと</option>
           <option value="monthly">毎月</option>
         </select>
       </div>
+      <div class="form-group" id="cycle-day-group">
+        <label class="form-label" id="cycle-day-label">もらう曜日</label>
+        <select class="form-select" id="set-cycle-dow">
+          <option value="0">日曜日</option>
+          <option value="1">月曜日</option>
+          <option value="2">火曜日</option>
+          <option value="3">水曜日</option>
+          <option value="4">木曜日</option>
+          <option value="5">金曜日</option>
+          <option value="6">土曜日</option>
+        </select>
+        <select class="form-select" id="set-cycle-day" style="display:none">
+          <option value="1">1日</option><option value="2">2日</option><option value="3">3日</option><option value="4">4日</option><option value="5">5日</option>
+          <option value="6">6日</option><option value="7">7日</option><option value="8">8日</option><option value="9">9日</option><option value="10">10日</option>
+          <option value="11">11日</option><option value="12">12日</option><option value="13">13日</option><option value="14">14日</option><option value="15">15日</option>
+          <option value="16">16日</option><option value="17">17日</option><option value="18">18日</option><option value="19">19日</option><option value="20">20日</option>
+          <option value="21">21日</option><option value="22">22日</option><option value="23">23日</option><option value="24">24日</option><option value="25">25日</option>
+          <option value="26">26日</option><option value="27">27日</option><option value="28">28日</option><option value="29">29日(月末調整)</option><option value="30">30日(月末調整)</option><option value="31">月末</option>
+        </select>
+      </div>
       <div class="form-group">
-        <label class="form-label">次回もらう日</label>
-        <input class="form-input" id="set-next-date" type="date">
+        <label class="form-label">スタート日（最初にもらった日）</label>
+        <input class="form-input" id="set-start-date" type="date">
       </div>
       <button class="save-settings-btn" onclick="saveSettings()">保存する</button>
     </div>
@@ -1588,7 +1646,8 @@
     <div class="settings-card">
       <div class="settings-title">🔄 データ管理</div>
       <button type="button" class="save-settings-btn" style="background: linear-gradient(135deg, #8fa87e, #a0bc8e); margin-bottom: 10px;" onclick="exportData()">📤 データをコピー（バックアップ）</button>
-      <button type="button" class="save-settings-btn" style="background: linear-gradient(135deg, #b0a0a0, #c0b0b0); margin-bottom: 10px;" onclick="document.getElementById('modal-import').classList.add('open')">📥 データを貼り付け（復元）</button>
+      <button type="button" class="save-settings-btn" style="background: linear-gradient(135deg, #d8c8a0, #c0b088); margin-bottom: 10px;" onclick="openHistoryModal()">🕒 履歴から復元（自動バックアップ）</button>
+      <button type="button" class="save-settings-btn" style="background: linear-gradient(135deg, #b0a0a0, #c0b0b0); margin-bottom: 10px;" onclick="document.getElementById('modal-import').classList.add('open')">📥 データを貼り付け（手動復元）</button>
       <button type="button" class="save-settings-btn" style="background: linear-gradient(135deg, #d04040, #e05050); color:white; font-weight:700;" onclick="resetAllData()">⚠️ データをリセット</button>
     </div>
   </div>
@@ -1611,7 +1670,7 @@
   </button>
   <button class="tab-item" onclick="switchTab('goals', this)">
     <span class="tab-icon">🎯</span>
-    <span class="tab-label">めざせ</span>
+    <span class="tab-label">目標を決める</span>
   </button>
   <button class="tab-item" onclick="switchTab('settings', this)">
     <span class="tab-icon">⚙️</span>
@@ -1735,6 +1794,17 @@
 </div>
 
 
+<!-- 履歴から復元モーダル -->
+<div class="modal-overlay" id="modal-history">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <button type="button" class="modal-close" onclick="document.getElementById('modal-history').classList.remove('open')">✕</button>
+    <div class="modal-title">🕒 履歴から復元</div>
+    <p style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;line-height:1.6;text-align:center;">アプリが自動でとっておいたバックアップから戻せるよ。<br>戻したい時点をえらんでね。</p>
+    <div id="history-list" style="max-height:400px;overflow-y:auto;"></div>
+  </div>
+</div>
+
 <!-- エクスポートモーダル -->
 <div class="modal-overlay" id="modal-export">
   <div class="modal-sheet">
@@ -1850,27 +1920,231 @@ function loadData() {
   return JSON.parse(JSON.stringify(DEFAULT_DATA));
 }
 
-// IndexedDBから読み込み（より新しいデータがあれば）
+// IndexedDBから読み込み + 自動復旧
 async function loadDataFromIDB() {
   try {
     const idbData = await idbGet(STORAGE_KEY);
-    if (idbData) {
+    if (idbData && Array.isArray(idbData.transactions)) {
+      // メインデータ取得成功
       data = idbData;
-      // localStorageにも同期
       localStorage.setItem(STORAGE_KEY, JSON.stringify(idbData));
+      return true;
+    }
+
+    // メインが消えていた場合、自動復旧を試みる
+    console.warn('Main data not found, attempting auto-recovery');
+
+    // (a) スナップショット履歴から最新を取得
+    const snapshots = await getAllSnapshots();
+    if (snapshots.length > 0 && Array.isArray(snapshots[0].data?.transactions)) {
+      data = snapshots[0].data;
+      saveData(data);
+      console.log('Recovered from snapshot:', snapshots[0].timestamp);
+      showToast('データを復旧したよ ✓');
+      return true;
+    }
+
+    // (b) 日次バックアップから最新を取得
+    const dailies = getAllDailyBackups();
+    if (dailies.length > 0 && Array.isArray(dailies[0].data?.transactions)) {
+      data = dailies[0].data;
+      saveData(data);
+      console.log('Recovered from daily backup:', dailies[0].date);
+      showToast('日次バックアップから復旧 ✓');
       return true;
     }
   } catch(e) { console.error('IDB load error', e); }
   return false;
 }
 
-// 保存：localStorageとIndexedDBの両方に保存
+// 保存：localStorage + IndexedDB + 履歴スナップショット
 function saveData(d) {
+  const json = JSON.stringify(d);
+
+  // 1. localStorage（メイン）
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+    localStorage.setItem(STORAGE_KEY, json);
   } catch(e) { console.error('localStorage save error', e); }
-  // IndexedDBにも非同期保存
+
+  // 2. IndexedDB（メイン）
   idbSet(STORAGE_KEY, d).catch(e => console.error('IDB save error', e));
+
+  // 3. 自動スナップショット履歴（IDB内に最新10世代を保持）
+  try {
+    const ts = new Date().toISOString();
+    idbSet('snapshot_' + ts, { timestamp: ts, data: d }).then(() => {
+      pruneOldSnapshots();
+    }).catch(()=>{});
+  } catch(e) {}
+
+  // 4. 日次バックアップ（1日1回、localStorageに別キーで保存）
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const dailyKey = 'daily_' + today;
+    localStorage.setItem(dailyKey, json);
+    pruneOldDailyBackups();
+  } catch(e) {}
+}
+
+
+async function openHistoryModal() {
+  const list = document.getElementById('history-list');
+  list.innerHTML = '<div style="text-align:center;color:var(--ink-soft);padding:20px;">読み込み中...</div>';
+  document.getElementById('modal-history').classList.add('open');
+
+  const snapshots = await getAllSnapshots();
+  const dailies = getAllDailyBackups();
+
+  // 結合して時系列順にソート
+  const items = [];
+  snapshots.forEach(s => {
+    if (s.data && Array.isArray(s.data.transactions)) {
+      items.push({
+        type: '自動',
+        timestamp: s.timestamp,
+        label: new Date(s.timestamp).toLocaleString('ja-JP', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),
+        count: s.data.transactions.length,
+        data: s.data
+      });
+    }
+  });
+  dailies.forEach(d => {
+    if (d.data && Array.isArray(d.data.transactions)) {
+      items.push({
+        type: '日次',
+        timestamp: d.date + 'T23:59:59',
+        label: d.date.slice(5).replace('-','/') + ' (1日のおわり)',
+        count: d.data.transactions.length,
+        data: d.data
+      });
+    }
+  });
+  items.sort((a,b) => b.timestamp.localeCompare(a.timestamp));
+
+  if (items.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:var(--ink-soft);padding:20px;font-size:13px;">バックアップ履歴がまだないよ</div>';
+    return;
+  }
+
+  list.innerHTML = items.map((it, i) => `
+    <div style="background:white;border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 2px 6px var(--shadow);display:flex;align-items:center;gap:10px;">
+      <div style="background:${it.type === '自動' ? '#e8f4e0' : '#fde8f4'};color:${it.type === '自動' ? 'var(--sage)' : '#d060a0'};border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;flex-shrink:0;">${it.type}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;">${it.label}</div>
+        <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">きろく ${it.count}こ</div>
+      </div>
+      <button type="button" onclick="restoreSnapshot(${i})" style="background:var(--rose);color:white;border:none;border-radius:8px;padding:8px 14px;font-family:'Zen Maru Gothic',sans-serif;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;">これに戻す</button>
+    </div>
+  `).join('');
+
+  window.__historyItems = items;
+}
+
+async function restoreSnapshot(index) {
+  const items = window.__historyItems;
+  if (!items || !items[index]) return;
+  const it = items[index];
+
+  const ok = await customConfirm(
+    'バックアップから復元',
+    `${it.label}の状態に戻すよ。\n（きろく${it.count}こ）\n\nいまのデータは上書きされます`,
+    '戻す'
+  );
+  if (!ok) return;
+
+  if (restoreFromBackup(it.data)) {
+    document.getElementById('modal-history').classList.remove('open');
+    showToast('復元したよ ✓');
+  } else {
+    showToast('復元できなかった');
+  }
+}
+
+// 古いスナップショット削除（最新10世代だけ残す）
+async function pruneOldSnapshots() {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.getAllKeys();
+    req.onsuccess = () => {
+      const keys = req.result.filter(k => typeof k === 'string' && k.startsWith('snapshot_'));
+      keys.sort();
+      const toDelete = keys.slice(0, Math.max(0, keys.length - 10));
+      toDelete.forEach(k => store.delete(k));
+    };
+  } catch(e) {}
+}
+
+// 古い日次バックアップ削除（30日分だけ残す）
+function pruneOldDailyBackups() {
+  try {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('daily_')) {
+        const dateStr = k.replace('daily_', '');
+        if (new Date(dateStr) < cutoff) {
+          localStorage.removeItem(k);
+        }
+      }
+    }
+  } catch(e) {}
+}
+
+// 全スナップショット取得（復元用）
+async function getAllSnapshots() {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAllKeys();
+      req.onsuccess = async () => {
+        const keys = req.result.filter(k => typeof k === 'string' && k.startsWith('snapshot_'));
+        keys.sort().reverse();
+        const snaps = [];
+        for (const k of keys) {
+          const v = await idbGet(k);
+          if (v) snaps.push(v);
+        }
+        resolve(snaps);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  } catch(e) { return []; }
+}
+
+// 日次バックアップ一覧
+function getAllDailyBackups() {
+  const list = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('daily_')) {
+      try {
+        list.push({
+          date: k.replace('daily_', ''),
+          data: JSON.parse(localStorage.getItem(k))
+        });
+      } catch(e) {}
+    }
+  }
+  return list.sort((a,b) => b.date.localeCompare(a.date));
+}
+
+// 復元実行
+function restoreFromBackup(backupData) {
+  if (!backupData || !Array.isArray(backupData.transactions)) return false;
+  data = backupData;
+  saveData(data);
+  updateOwnerLabel();
+  renderHome();
+  renderGoals();
+  renderSettings();
+  renderSettingsTxList();
+  renderCalendarPage();
+  return true;
 }
 
 let data = loadData();
@@ -2110,8 +2384,177 @@ function renderHome() {
   document.getElementById('home-piggy').textContent = fmt(calcPiggyTotal());
   renderHomeGoals();
   renderHomeTxList();
-  renderBackupReminder();
+  renderUnclaimedCard();
 }
+
+// ====== おこづかい自動計算 ======
+function onCycleChange() {
+  const cycle = document.getElementById('set-cycle').value;
+  const dowSel = document.getElementById('set-cycle-dow');
+  const daySel = document.getElementById('set-cycle-day');
+  const label = document.getElementById('cycle-day-label');
+  if (!dowSel || !daySel || !label) return;
+  if (cycle === 'monthly') {
+    dowSel.style.display = 'none';
+    daySel.style.display = 'block';
+    label.textContent = 'もらう日にち';
+  } else {
+    dowSel.style.display = 'block';
+    daySel.style.display = 'none';
+    label.textContent = 'もらう曜日';
+  }
+}
+
+// 期間内に「もらう日」が何回あるか計算
+function calcAllowanceDates(fromDate, toDate) {
+  const s = data.settings;
+  if (!s.startDate || !s.amount) return [];
+
+  const start = new Date(s.startDate);
+  start.setHours(0,0,0,0);
+  const from = new Date(fromDate);
+  from.setHours(0,0,0,0);
+  const to = new Date(toDate);
+  to.setHours(0,0,0,0);
+
+  if (to < start) return [];
+
+  const dates = [];
+  const cycle = s.cycle || 'weekly';
+
+  if (cycle === 'weekly' || cycle === 'biweekly') {
+    const dow = s.cycleDow !== undefined ? s.cycleDow : start.getDay();
+    const interval = cycle === 'weekly' ? 7 : 14;
+
+    // start以降で最初の指定曜日
+    let cur = new Date(start);
+    const startDow = cur.getDay();
+    let diff = (dow - startDow + 7) % 7;
+    cur.setDate(cur.getDate() + diff);
+
+    while (cur <= to) {
+      if (cur >= from && cur >= start) {
+        dates.push(cur.toISOString().split('T')[0]);
+      }
+      cur.setDate(cur.getDate() + interval);
+    }
+  } else if (cycle === 'monthly') {
+    const day = s.cycleDay || 1;
+    let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    while (cur <= to) {
+      // その月の指定日にち（月末調整）
+      const lastDay = new Date(cur.getFullYear(), cur.getMonth()+1, 0).getDate();
+      const targetDay = Math.min(day === 31 ? lastDay : day, lastDay);
+      const target = new Date(cur.getFullYear(), cur.getMonth(), targetDay);
+      if (target >= start && target >= from && target <= to) {
+        dates.push(target.toISOString().split('T')[0]);
+      }
+      cur.setMonth(cur.getMonth() + 1);
+    }
+  }
+
+  return dates;
+}
+
+// 未受取分を計算（既に受け取った予定日を除外）
+function calcUnclaimedAllowance() {
+  const s = data.settings;
+  if (!s.startDate || !s.amount || s.amount <= 0) return { count: 0, total: 0, dates: [] };
+
+  // 既に受取済みの予定日を集める
+  // 旧形式：date自体が予定日 / 新形式：claimedDates配列を持つ
+  const claimedDates = new Set();
+  data.transactions
+    .filter(t => t.type === 'in' && t.category === 'おこづかい')
+    .forEach(t => {
+      if (Array.isArray(t.claimedDates) && t.claimedDates.length > 0) {
+        // 新形式：受取に含まれた全予定日
+        t.claimedDates.forEach(d => claimedDates.add(d));
+      } else {
+        // 旧形式：dateそのものが予定日
+        claimedDates.add(t.date);
+      }
+    });
+
+  const today = new Date();
+  // スタート日〜今日までの全受取予定日を取得
+  const allDates = calcAllowanceDates(new Date(s.startDate), today);
+
+  // まだ受け取っていない日だけ抽出
+  const unclaimedDates = allDates.filter(d => !claimedDates.has(d));
+
+  return {
+    count: unclaimedDates.length,
+    total: unclaimedDates.length * s.amount,
+    dates: unclaimedDates,
+    amount: s.amount
+  };
+}
+
+// 未受取カードを描画
+function renderUnclaimedCard() {
+  const card = document.getElementById('unclaimed-card');
+  if (!card) return;
+  const u = calcUnclaimedAllowance();
+  if (u.count === 0) { card.style.display = 'none'; return; }
+
+  card.style.display = 'flex';
+  const detail = u.count === 1
+    ? `${u.dates[0].slice(5).replace('-','/')}の分`
+    : `${u.count}回分まとめて`;
+
+  card.innerHTML = `
+    <div class="uc-icon">💴</div>
+    <div class="uc-info">
+      <div class="uc-label">もらってないおこづかい</div>
+      <div class="uc-amount"><span>¥</span>${fmt(u.total)}</div>
+      <div class="uc-detail">${detail}</div>
+    </div>
+    <button type="button" class="uc-claim-btn" onclick="claimAllowance()">受け取る</button>
+  `;
+}
+
+// 受け取る処理
+async function claimAllowance() {
+  const u = calcUnclaimedAllowance();
+  if (u.count === 0) return;
+  const ok = await customConfirm(
+    'おこづかい受け取り',
+    `¥${fmt(u.total)}（${u.count}回分）を受け取るよ。\nいい？`,
+    '受け取る'
+  );
+  if (!ok) return;
+
+  // ボタンを押した日（ローカル時刻）で1件だけ、合計金額で記録
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const today = `${yyyy}-${mm}-${dd}`;
+  const memo = u.count > 1 ? `${u.count}回分まとめて` : '';
+
+  data.transactions.push({
+    id: Date.now().toString(),
+    date: today,
+    type: 'in',
+    amount: u.total,
+    category: 'おこづかい',
+    memo: memo,
+    // 受取済みとした予定日リストを保持（重複受取防止用）
+    claimedDates: u.dates
+  });
+
+  saveData(data);
+
+  // ホームのリスト月を今日の月に
+  homeTxMonth = new Date();
+
+  renderHome();
+  renderCalendarPage();
+  showToast(`¥${fmt(u.total)}受け取ったよ ✓`);
+}
+
+
 
 function renderBackupReminder() {
   const el = document.getElementById('backup-reminder');
@@ -2778,7 +3221,10 @@ function renderSettings() {
   document.getElementById('set-owner-name').value = s.ownerName || '';
   document.getElementById('set-amount').value = s.amount || '';
   document.getElementById('set-cycle').value = s.cycle || 'weekly';
-  document.getElementById('set-next-date').value = s.nextDate || '';
+  document.getElementById('set-cycle-dow').value = s.cycleDow !== undefined ? s.cycleDow : 0;
+  document.getElementById('set-cycle-day').value = s.cycleDay || 1;
+  document.getElementById('set-start-date').value = s.startDate || '';
+  onCycleChange();
   document.getElementById('set-init-balance').value = s.initBalance || '';
   document.getElementById('set-init-piggy').value = s.initPiggy || '';
   document.getElementById('stats-count').textContent = data.transactions.length + 'こ';
@@ -2804,7 +3250,9 @@ function saveSettings() {
   data.settings.ownerName = document.getElementById('set-owner-name').value.trim();
   data.settings.amount = parseInt(document.getElementById('set-amount').value) || 500;
   data.settings.cycle = document.getElementById('set-cycle').value;
-  data.settings.nextDate = document.getElementById('set-next-date').value;
+  data.settings.cycleDow = parseInt(document.getElementById('set-cycle-dow').value);
+  data.settings.cycleDay = parseInt(document.getElementById('set-cycle-day').value);
+  data.settings.startDate = document.getElementById('set-start-date').value;
   data.settings.initBalance = parseInt(document.getElementById('set-init-balance').value) || 0;
   data.settings.initPiggy = parseInt(document.getElementById('set-init-piggy').value) || 0;
   saveData(data);
