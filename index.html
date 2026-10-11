@@ -944,6 +944,27 @@
   }
   .uc-claim-btn:active { background: #f0f0f0; }
 
+  /* 受け取り回数ボタン */
+  .claim-count-btn {
+    background: white;
+    border: 1.5px solid var(--blush-deep);
+    border-radius: 10px;
+    padding: 8px 4px;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1.3;
+  }
+  .claim-count-btn.selected {
+    background: var(--blush);
+    border-color: var(--rose);
+    color: var(--rose);
+  }
+
+
   /* バックアップリマインダー */
   .backup-reminder {
     background: linear-gradient(135deg, #fef3d0, #fde5a0);
@@ -1763,6 +1784,39 @@
   </div>
 </div>
 
+<!-- おこづかい受け取りモーダル -->
+<div class="modal-overlay" id="modal-claim">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <button type="button" class="modal-close" onclick="document.getElementById('modal-claim').classList.remove('open')">✕</button>
+    <div class="modal-title">💴 おこづかいを受け取る</div>
+
+    <div id="claim-summary" style="text-align:center;font-size:13px;color:var(--ink-soft);margin-bottom:18px;line-height:1.6;"></div>
+
+    <div class="form-group">
+      <label class="form-label">受け取る金額（自由に入力OK）</label>
+      <div class="amount-input-wrap">
+        <span class="yen">¥</span>
+        <input class="form-input" id="claim-amount" type="number" inputmode="numeric" style="font-size:20px;font-weight:700;">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">かんたん入力（タップで金額セット）</label>
+      <div id="claim-count-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;"></div>
+      <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">※ ボタンを押さずに自分で金額を書いてもOK</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">何回分として記録する？</label>
+      <select class="form-select" id="claim-count-select"></select>
+      <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">※ 自動で選ばれるけど、変えてもOK</div>
+    </div>
+
+    <button type="button" class="submit-btn" onclick="submitClaim()">受け取る ✓</button>
+  </div>
+</div>
+
 <!-- 貯金箱→目標 振替モーダル -->
 <div class="modal-overlay" id="modal-transfer">
   <div class="modal-sheet">
@@ -2510,8 +2564,124 @@ function renderUnclaimedCard() {
       <div class="uc-amount"><span>¥</span>${fmt(u.total)}</div>
       <div class="uc-detail">${detail}</div>
     </div>
-    <button type="button" class="uc-claim-btn" onclick="claimAllowance()">受け取る</button>
+    <button type="button" class="uc-claim-btn" onclick="openClaimModal()">受け取る</button>
   `;
+}
+
+
+// ====== おこづかい受け取りモーダル ======
+let claimSelectedCount = 0;
+let claimUnclaimedData = null;
+
+function openClaimModal() {
+  const u = calcUnclaimedAllowance();
+  if (u.count === 0) { showToast('もらってないおこづかいはないよ'); return; }
+
+  claimUnclaimedData = u;
+  claimSelectedCount = u.count; // デフォルトは全部
+
+  document.getElementById('claim-summary').innerHTML =
+    `もらってない: <strong style="color:var(--rose);font-size:15px;">${u.count}回分（¥${fmt(u.total)}）</strong>`;
+
+  // クイック入力ボタン（1回〜総数、最大12個）
+  const grid = document.getElementById('claim-count-grid');
+  const maxShow = Math.min(u.count, 12);
+  let btnHTML = '';
+  for (let i = 1; i <= maxShow; i++) {
+    btnHTML += `<button type="button" class="claim-count-btn ${i === u.count ? 'selected' : ''}" data-count="${i}" onclick="selectClaimCount(${i})">${i}回<br><span style="font-size:10px;">¥${fmt(i * u.amount)}</span></button>`;
+  }
+  grid.innerHTML = btnHTML;
+
+  // 回数selectの選択肢（1〜総数）
+  const sel = document.getElementById('claim-count-select');
+  let selHTML = '';
+  for (let i = 1; i <= u.count; i++) {
+    selHTML += `<option value="${i}" ${i === u.count ? 'selected' : ''}>${i}回分</option>`;
+  }
+  sel.innerHTML = selHTML;
+
+  // 金額入力欄にデフォルト（全部）
+  document.getElementById('claim-amount').value = u.total;
+
+  // 金額欄が変更されたら、クイックボタンの選択状態を更新
+  const amtInput = document.getElementById('claim-amount');
+  amtInput.oninput = () => {
+    const v = parseInt(amtInput.value) || 0;
+    document.querySelectorAll('.claim-count-btn').forEach(b => {
+      const amt = parseInt(b.dataset.count) * claimUnclaimedData.amount;
+      b.classList.toggle('selected', amt === v);
+    });
+    // 回数も推定（割り切れたら更新）
+    if (claimUnclaimedData.amount > 0 && v % claimUnclaimedData.amount === 0) {
+      const guess = Math.min(Math.max(1, v / claimUnclaimedData.amount), claimUnclaimedData.count);
+      sel.value = guess;
+      claimSelectedCount = guess;
+    }
+  };
+
+  // 回数selectが変更されたら金額欄も更新
+  sel.onchange = () => {
+    const n = parseInt(sel.value);
+    claimSelectedCount = n;
+    amtInput.value = n * claimUnclaimedData.amount;
+    document.querySelectorAll('.claim-count-btn').forEach(b => {
+      b.classList.toggle('selected', parseInt(b.dataset.count) === n);
+    });
+  };
+
+  document.getElementById('modal-claim').classList.add('open');
+}
+
+function selectClaimCount(n) {
+  claimSelectedCount = n;
+  document.querySelectorAll('.claim-count-btn').forEach(b => {
+    b.classList.toggle('selected', parseInt(b.dataset.count) === n);
+  });
+  document.getElementById('claim-amount').value = n * claimUnclaimedData.amount;
+  document.getElementById('claim-count-select').value = n;
+}
+
+async function submitClaim() {
+  if (!claimUnclaimedData) return;
+  const amount = parseInt(document.getElementById('claim-amount').value);
+  if (!amount || amount <= 0) { showToast('金額を入れてね'); return; }
+
+  const count = claimSelectedCount || 1;
+  const claimedDates = claimUnclaimedData.dates.slice(0, count);
+
+  // 確認
+  const ok = await customConfirm(
+    'おこづかい受け取り',
+    `¥${fmt(amount)}（${count}回分）を受け取るよ。\nいい？`,
+    '受け取る'
+  );
+  if (!ok) return;
+
+  // 今日の日付（ローカル）
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const today = `${yyyy}-${mm}-${dd}`;
+
+  const memo = count > 1 ? `${count}回分まとめて` : '';
+
+  data.transactions.push({
+    id: Date.now().toString(),
+    date: today,
+    type: 'in',
+    amount: amount,
+    category: 'おこづかい',
+    memo: memo,
+    claimedDates: claimedDates
+  });
+
+  saveData(data);
+  homeTxMonth = new Date();
+  document.getElementById('modal-claim').classList.remove('open');
+  renderHome();
+  renderCalendarPage();
+  showToast(`¥${fmt(amount)}受け取ったよ ✓`);
 }
 
 // 受け取る処理
@@ -3272,6 +3442,7 @@ function changeMonth(dir) {
   currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + dir, 1);
   renderRecord();
 }
+
 
 async function resetAllData() {
   const ok = await customConfirm('全データをリセット', '全てのきろくと設定を消します。\n本当にいいですか？', 'リセット');
